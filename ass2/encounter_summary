@@ -1,0 +1,111 @@
+#! /usr/bin/env python3
+
+
+"""
+COMP3311
+23T1
+Assignment 2
+Pokemon Database
+
+Written by: <YOUR NAME HERE> <YOUR STUDENT ID HERE>
+Written on: <DATE HERE>
+
+Encounter Summary
+
+Print a summary of all the Pokemon that can be encountered at a given location in a given game
+"""
+
+
+import sys
+import psycopg2
+import helpers
+
+
+### Constants
+USAGE = f"Usage: {sys.argv[0]} <Location> <Game>"
+
+
+### Globals
+db = None
+Location = None
+Game = None
+
+
+### Command-line args
+if len(sys.argv) != 3:
+    print(USAGE, file=sys.stderr)
+    sys.exit(1)
+Location = helpers.clean(sys.argv[1])
+Game     = helpers.clean(sys.argv[2])
+
+
+def main():
+    Location_Print = helpers.clean(sys.argv[1])
+    
+    curr.callproc('Game_Info_check', [Game])
+    tup_list1 = curr.fetchall()
+
+    curr.callproc('Location_Info_check', [Location])
+    tup_list2 = curr.fetchall()
+    # print(tup_list2)
+    
+    curr.callproc('Location_InGame_check', [Game, Location])
+    tup_list3 = curr.fetchall()
+    # Check for valid Game name
+    if (tup_list1 == []): print("'Pokemon %s' isn't a game in the Pokemon series." % Game, file=sys.stderr)
+    elif (tup_list2 == []): print("'%s' isn't a location in the Pokemon series." % Location_Print, file=sys.stderr)
+    elif (tup_list3 == []): print("'%s' isn't in 'Pokemon %s'." % (Location_Print, Game), file=sys.stderr)
+    else :
+        
+        curr.callproc('Pokemon_Encounters', [Location, Game])
+
+        tup_list = curr.fetchall()
+
+        
+
+        print("In 'Pokemon %s' at '%s' the following Pokemon can be Encountered:\n" % (Game, Location_Print))
+        
+        for i in range(0,len(tup_list)):
+            # Get Types of pokemon
+            curr.callproc('First_Types_Info_Encounter', [tup_list[i][2]])
+            firstType = curr.fetchall()
+            curr.callproc('Second_Types_Info_Encounter', [tup_list[i][2]])
+            secondType = curr.fetchall()
+
+            if (firstType == []) :
+                pokemonType = secondType[0][0]
+            elif (secondType == []) :
+                pokemonType = firstType[0][0]
+            else :  
+                pokemonType = firstType[0][0] + '/' + secondType[0][0]
+
+            # Print pokemon Info
+            print("\t%s:" % tup_list[i][2])
+            print("\t"* 2 + "Type: " + pokemonType)
+            print("\t"* 2 + "Rarity: %s" % tup_list[i][3] + "%")
+            print("\t"* 2 + "Levels: min %s, max %s" % (tup_list[i][6], tup_list[i][7]))
+            if (tup_list[i][4] != []):
+                print("\t"* 2 + "Egg Groups: %s" % tup_list[i][4])
+            if (tup_list[i][5] != []):
+                print("\t"* 2 + "Abilities: %s" % tup_list[i][5])
+            print("\t"* 2 + "Encounter Requirements:")
+            if (tup_list[i][9] == True):
+                print("\t"* 3 + "NOT %s\n" % tup_list[i][8])
+            else :
+                print("\t"* 3 + "%s\n" % tup_list[i][8])
+                
+
+if __name__ == '__main__':
+    try:
+        db = psycopg2.connect(dbname="ass2")
+        curr = db.cursor()
+        main()
+    except psycopg2.Error as err:
+        print("DB error: ", err)
+    except Exception as err:
+        print("Internal Error: ", err)
+        raise err
+    finally:
+        if db is not None:
+            db.close()
+    sys.exit(0)

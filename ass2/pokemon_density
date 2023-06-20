@@ -1,0 +1,99 @@
+#! /usr/bin/env python3
+
+
+"""
+COMP3311
+23T1
+Assignment 2
+Pokemon Database
+
+Written by: <YOUR NAME HERE> <YOUR STUDENT ID HERE>
+Written on: <DATE HERE>
+
+Pokemon Density
+
+Find the density of pokemon in each location within a given region.
+"""
+
+query = '''
+SELECT 
+    games.name 
+FROM 
+    games 
+WHERE
+    games.region = %s;
+'''
+
+import math
+import sys
+import psycopg2
+import helpers
+
+
+### Constants
+USAGE = f"Usage: {sys.argv[0]} <Region>"
+
+
+### Globals
+db = None
+Region = None
+
+
+### Command-line args
+if len(sys.argv) != 2:
+    print(USAGE, file=sys.stderr)
+    sys.exit(1)
+Region = helpers.clean(sys.argv[1])
+
+
+def main():
+
+    curr.callproc('is_valid_region', [Region])
+    tup_list = curr.fetchall()
+    # Check for valid region name
+    if (tup_list[0][0] == False): print("'%s' isn't a region in the Pokemon series." % Region, file=sys.stderr)
+    else :
+
+        print("The average density of Pokemon within each location in the '%s' region:\n" % Region)
+        curr.execute(query, [Region])
+        tup_list = curr.fetchall()
+        
+        # List of pokemon density in a location of that region
+
+        curr.callproc('Pokemon_density', [Region])
+        tup_list = curr.fetchall()
+        for i in range(0, len(tup_list)):
+            print("%s : %s" % (tup_list[i][0], '{:.4f}'.format(tup_list[i][3], 4)))
+        list1 = []
+        for row in tup_list:
+            list1.append(row[0])
+
+        # List of no pokemon density in a location of that region
+    
+        curr.callproc('Pokemon_No_density', [Region])
+        tup_list = curr.fetchall()
+
+        list2 = []
+        for row in tup_list:
+            list2.append(row[0])
+        print("\nThe following locations in the '%s' region have no wild Pokemon encounters:\n" % Region)
+        ListOfLocationWhereNoPokemonEncounters = [elem for elem in list2 if elem not in list1]
+        for row in ListOfLocationWhereNoPokemonEncounters:
+            print(row)
+
+if __name__ == '__main__':
+    try:
+        db = psycopg2.connect(dbname="ass2")
+        curr = db.cursor()
+        main()
+    except psycopg2.Error as err:
+        print("DB error: ", err)
+    except Exception as err:
+        print("Internal Error: ", err)
+        raise err
+    finally:
+        if db is not None:
+            db.close()
+    sys.exit(0)
+
+

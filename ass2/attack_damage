@@ -1,0 +1,127 @@
+#! /usr/bin/env python3
+
+
+"""
+COMP3311
+23T1
+Assignment 2
+Pokemon Database
+
+Written by: <YOUR NAME HERE> <YOUR STUDENT ID HERE>
+Written on: <DATE HERE>
+
+Attack Damage
+
+Given the name of an attacking, and a defending pokemon along with the name of a game in the Pokemon series,
+display a list, ordered from lowest to highest damage,
+of all the moves the attacking pokemon could use on the defending pokemon in the given game.
+"""
+
+
+from random import Random
+import sys
+import psycopg2
+import helpers
+
+
+### Constants
+USAGE = f"Usage: {sys.argv[0]} <Attacking Pokemon Name> <Defending Pokemon Name> <Pokemon Game Name>"
+
+
+### Globals
+db = None
+Attacking_Pokemon_Name = None
+Defending_Pokemon_Name = None
+Pokemon_Game_Name      = None
+
+
+### Command-line args
+if len(sys.argv) != 4:
+    print(USAGE, file=sys.stderr)
+    sys.exit(1)
+Attacking_Pokemon_Name = helpers.clean(sys.argv[1])
+Defending_Pokemon_Name = helpers.clean(sys.argv[2])
+Pokemon_Game_Name      = helpers.clean(sys.argv[3])
+
+
+def min_damage(attackPower, attackerAttack, defenderDefense, STAB, typeEffectiveness) :
+    return int(round(((48/1000 * attackPower * attackerAttack / defenderDefense + 2 ) * float(STAB) * 0.85 * typeEffectiveness/100) , 1))
+
+def max_damage(attackPower, attackerAttack, defenderDefense, STAB, typeEffectiveness) :
+    return int(round(((84/100 * attackPower * attackerAttack / defenderDefense + 2) * float(STAB) * typeEffectiveness/100 ), 1))
+
+def main():
+    
+    curr.callproc('Pokemon_ID_func', [Attacking_Pokemon_Name])
+    tup_list = curr.fetchall()
+    
+    curr.callproc('Pokemon_ID_func', [Defending_Pokemon_Name])
+    tup_list1 = curr.fetchall()
+
+    curr.callproc('Game_Info_check', [Pokemon_Game_Name])
+    tup_list2 = curr.fetchall()
+    
+    curr.callproc('Pokemon_InGame_check', [Pokemon_Game_Name, Attacking_Pokemon_Name])
+    tup_list3 = curr.fetchall()
+
+    curr.callproc('Pokemon_InGame_check', [Pokemon_Game_Name, Defending_Pokemon_Name])
+    tup_list4 = curr.fetchall()
+
+    # Check for valid Inputs
+    if (tup_list == []): print("'%s' isn't a Pokemon that exists." % Attacking_Pokemon_Name, file=sys.stderr)
+    elif (tup_list1 == []): print("'%s' isn't a Pokemon that exists." % Defending_Pokemon_Name, file=sys.stderr)
+    elif (tup_list2 == []): print("'Pokemon %s' isn't a game in the Pokemon series." % Pokemon_Game_Name, file=sys.stderr)
+    elif (tup_list3 == []): print("'%s' doesn't appear in 'Pokemon %s'." % (Attacking_Pokemon_Name, Pokemon_Game_Name), file=sys.stderr)
+    elif (tup_list3 == []): print("'%s' doesn't appear in 'Pokemon %s'." % (Defending_Pokemon_Name, Pokemon_Game_Name), file=sys.stderr)
+    else :
+        
+    
+        curr.callproc('Attack_Damage', [Pokemon_Game_Name, Attacking_Pokemon_Name])
+
+        curr.callproc('Update_Depending', [Defending_Pokemon_Name])
+
+        curr.callproc('Update_multiplier', [Defending_Pokemon_Name])
+        multiplier_list = []
+        multiplier = curr.fetchall()
+        # print(multiplier_list)
+        for row in multiplier:
+            multiplier_list.append([row[0],row[1]])
+        # print(multiplier_list)
+        # print(multiplier_list[1][1])
+        curr.execute('Select * from attack_damage_results')
+
+        attack_damage_list = []
+        attack = curr.fetchall()
+        if (attack == []):   print ("In 'Pokemon %s', '%s' can't attack '%s'." % (Pokemon_Game_Name, Attacking_Pokemon_Name, Defending_Pokemon_Name))
+        else :
+            for row in attack:
+                effectiveness = row[8]
+                for row1 in multiplier_list:
+                    if row[0] == row1[0]: 
+                        effectiveness = effectiveness * row1[1] / 100                  
+                attack_damage_list.append([row[1], min_damage(row[3],row[5],row[6],row[7], effectiveness), max_damage(row[3],row[5],row[6],row[7], effectiveness) ])
+
+            print("In 'Pokemon %s', When '%s' attacks '%s', '%s' can use the following moves:" % (Pokemon_Game_Name, Attacking_Pokemon_Name, Defending_Pokemon_Name, Attacking_Pokemon_Name))
+            
+            sorted_list = sorted(attack_damage_list, key=lambda x: (x[2], x[1], x[0]))
+
+            for row in sorted_list:
+                if ((row[1] > 0) & (row[2] > 0)) :
+                    print("\t '%s'  for a minimum of  %s damage and a maximum of   %s damage to '%s'." % (row[0], row[1], row[2], Defending_Pokemon_Name))
+
+
+
+if __name__ == '__main__':
+    try:
+        db = psycopg2.connect(dbname="ass2")
+        curr = db.cursor()
+        main()
+    except psycopg2.Error as err:
+        print("DB error: ", err)
+    except Exception as err:
+        print("Internal Error: ", err)
+        raise err
+    finally:
+        if db is not None:
+            db.close()
+    sys.exit(0)
